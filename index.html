@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CodeAlpha Translation Tool</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header>
+      <h1>Language Translation Tool</h1>
+      <p>Enter text, choose languages, and translate instantly.</p>
+    </header>
+
+    <main>
+      <div class="control-row">
+        <div class="input-group">
+          <label for="source-language">Source language</label>
+          <select id="source-language"></select>
+        </div>
+
+        <div class="input-group">
+          <label for="target-language">Target language</label>
+          <select id="target-language"></select>
+        </div>
+      </div>
+
+      <label for="source-text" class="text-label">Text to translate</label>
+      <textarea id="source-text" placeholder="Type or paste text here..."></textarea>
+
+      <div class="button-row">
+        <button id="translate-button" class="primary">Translate</button>
+        <button id="copy-button">Copy translation</button>
+        <button id="speak-button">Speak translation</button>
+      </div>
+
+      <label for="translated-text" class="text-label">Translated text</label>
+      <textarea id="translated-text" readonly placeholder="Translation result appears here..."></textarea>
+
+      <div class="info-box">
+        <p>
+          This app uses the Microsoft Translator Text API. Replace the placeholder API key and region in <code>script.js</code> before testing the translation feature.
+        </p>
+      </div>
+    </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
