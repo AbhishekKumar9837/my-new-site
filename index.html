@@ -1,51 +1,216 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CodeAlpha Translation Tool</title>
-  <link rel="stylesheet" href="styles.css" />
+  <title>LinguaFlow — Modern Language Translation Tool</title>
+  <meta name="description" content="LinguaFlow is a modern, fast, and beautiful language translation tool supporting 100+ languages with text-to-speech, history, and more." />
+  <meta name="keywords" content="translation, language translator, online translator, multilingual, text translation" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="app-shell">
-    <header>
-      <h1>Language Translation Tool</h1>
-      <p>Enter text, choose languages, and translate instantly.</p>
-    </header>
 
-    <main>
-      <div class="control-row">
-        <div class="input-group">
-          <label for="source-language">Source language</label>
-          <select id="source-language"></select>
-        </div>
-
-        <div class="input-group">
-          <label for="target-language">Target language</label>
-          <select id="target-language"></select>
-        </div>
-      </div>
-
-      <label for="source-text" class="text-label">Text to translate</label>
-      <textarea id="source-text" placeholder="Type or paste text here..."></textarea>
-
-      <div class="button-row">
-        <button id="translate-button" class="primary">Translate</button>
-        <button id="copy-button">Copy translation</button>
-        <button id="speak-button">Speak translation</button>
-      </div>
-
-      <label for="translated-text" class="text-label">Translated text</label>
-      <textarea id="translated-text" readonly placeholder="Translation result appears here..."></textarea>
-
-      <div class="info-box">
-        <p>
-          This app uses the Microsoft Translator Text API. Replace the placeholder API key and region in <code>script.js</code> before testing the translation feature.
-        </p>
-      </div>
-    </main>
+  <!-- Background Orbs -->
+  <div class="bg-orbs" aria-hidden="true">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
   </div>
 
-  <script src="script.js"></script>
+  <!-- Toast Notification -->
+  <div id="toast" class="toast" role="alert" aria-live="polite"></div>
+
+  <!-- Main App -->
+  <div class="app-wrapper">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="header-brand">
+        <div class="logo-icon" aria-hidden="true">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" stroke="currentColor" stroke-width="1.5"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-name">LinguaFlow</h1>
+          <p class="brand-tagline">Translate anything, instantly</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="themeToggle" class="btn-icon" aria-label="Toggle dark/light mode" title="Toggle theme">
+          <svg id="moonIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <svg id="sunIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none;">
+            <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="1.8"/>
+            <line x1="12" y1="1" x2="12" y2="3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="12" y1="21" x2="12" y2="23" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="1" y1="12" x2="3" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="21" y1="12" x2="23" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Translation Card -->
+    <main class="main-content">
+      <section class="translator-card" aria-label="Translation interface">
+
+        <!-- Language Selection Row -->
+        <div class="lang-row">
+          <div class="lang-select-wrapper">
+            <label for="sourceLang" class="lang-label">From</label>
+            <div class="select-container">
+              <select id="sourceLang" class="lang-select" aria-label="Select source language">
+                <option value="auto">🔍 Auto Detect</option>
+              </select>
+              <div class="select-arrow" aria-hidden="true">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <polyline points="6 9 12 15 18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- Swap Button -->
+          <button id="swapBtn" class="btn-swap" aria-label="Swap source and target languages" title="Swap languages">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M7 16V4m0 0L3 8m4-4l4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M17 8v12m0 0l4-4m-4 4l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+
+          <div class="lang-select-wrapper">
+            <label for="targetLang" class="lang-label">To</label>
+            <div class="select-container">
+              <select id="targetLang" class="lang-select" aria-label="Select target language">
+              </select>
+              <div class="select-arrow" aria-hidden="true">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <polyline points="6 9 12 15 18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Text Areas Row -->
+        <div class="text-areas-row">
+
+          <!-- Input Panel -->
+          <div class="text-panel input-panel">
+            <div class="panel-header">
+              <span class="panel-label">Source Text</span>
+              <span id="charCounter" class="char-counter">0 / 5000</span>
+            </div>
+            <textarea
+              id="inputText"
+              class="text-area"
+              placeholder="Enter text to translate…"
+              maxlength="5000"
+              rows="8"
+              aria-label="Text to translate"
+              spellcheck="true"
+            ></textarea>
+            <div class="panel-footer">
+              <button id="clearBtn" class="btn-ghost" aria-label="Clear all fields">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                Clear
+              </button>
+              <button id="translateBtn" class="btn-primary" aria-label="Translate text">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M5 8l6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Translate
+                <div id="loadingSpinner" class="spinner" aria-hidden="true" style="display:none;"></div>
+              </button>
+            </div>
+          </div>
+
+          <!-- Output Panel -->
+          <div class="text-panel output-panel">
+            <div class="panel-header">
+              <span class="panel-label">Translation</span>
+              <div id="detectedLangBadge" class="detected-badge" style="display:none;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                  <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                Detected: <span id="detectedLangName"></span>
+              </div>
+            </div>
+            <div
+              id="outputText"
+              class="text-area output-area"
+              aria-label="Translated text"
+              aria-live="polite"
+              role="region"
+            >
+              <span class="output-placeholder">Translation will appear here…</span>
+            </div>
+            <div class="panel-footer output-footer">
+              <button id="speakBtn" class="btn-ghost" aria-label="Read translation aloud" title="Text to Speech" disabled>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Listen
+              </button>
+              <button id="copyBtn" class="btn-ghost" aria-label="Copy translation to clipboard" title="Copy translation" disabled>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke="currentColor" stroke-width="1.8"/>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.8"/>
+                </svg>
+                Copy
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Translation History -->
+      <section class="history-section" aria-label="Translation history">
+        <div class="history-header">
+          <h2 class="history-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.8"/>
+              <polyline points="12 6 12 12 16 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Translation History
+          </h2>
+          <button id="clearHistoryBtn" class="btn-ghost-sm" aria-label="Clear all history">
+            Clear All
+          </button>
+        </div>
+        <div id="historyList" class="history-list" role="list">
+          <div class="history-empty">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" opacity="0.3">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5"/>
+              <polyline points="12 6 12 12 16 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <p>No translations yet.<br>Start translating to see your history here.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>Powered by <a href="https://mymemory.translated.net" target="_blank" rel="noopener noreferrer">MyMemory Translation API</a> · Built with ❤️ by LinguaFlow</p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
 </body>
 </html>
