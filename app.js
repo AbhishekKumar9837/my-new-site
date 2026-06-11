@@ -174,6 +174,7 @@ const state = {
   toastTimer:      null,
   speechSynthesis: window.speechSynthesis || null,
   currentUtterance: null,
+  currentAudio:    null,  // For Google TTS audio playback
 };
 
 /* ============================================================
@@ -536,8 +537,8 @@ function displayTranslation(text, detectedLang, apiName) {
 
   // Enable action buttons
   dom.copyBtn.disabled = false;
-  // Always enable Listen — browser may have online voices not listed in getVoices()
-  dom.speakBtn.disabled = !state.speechSynthesis;
+  // Always enable Listen — Google TTS audio works for all languages
+  dom.speakBtn.disabled = false;
 
   // Show detected language badge (or API source if language unknown)
   if (detectedLang) {
@@ -648,48 +649,156 @@ async function handleCopy() {
 
 /* ============================================================
    TEXT-TO-SPEECH
+   Uses Google Translate TTS audio (supports Hindi, Punjabi, Tamil,
+   and 50+ languages). Falls back to browser SpeechSynthesis.
    ============================================================ */
 
 /**
- * Find the best matching voice for a language code.
- * Returns null if none found — but speech may still work via online voices.
+ * Main speak handler — tries Google TTS audio first, then browser TTS.
  */
-function findVoice(langCode) {
-  if (!state.speechSynthesis) return null;
-  const voices = state.speechSynthesis.getVoices();
-  const base = langCode.split('-')[0].toLowerCase();
-
-  // Prefer exact match, then base-code match
-  return voices.find(v => v.lang.toLowerCase() === langCode.toLowerCase()) ||
-         voices.find(v => v.lang.split('-')[0].toLowerCase() === base) ||
-         null;
-}
-
 function handleSpeak() {
-  if (!state.speechSynthesis || !state.translatedText) return;
+  if (!state.translatedText) return;
 
+  // Toggle off if already speaking
   if (state.isSpeaking) {
     stopSpeaking();
     return;
   }
 
   const targetLang = dom.targetLang.value;
+  const text = state.translatedText;
 
-  // Map language code to BCP-47 for SpeechSynthesis
-  const langMap = { 'zh': 'zh-CN', 'zh-TW': 'zh-TW', 'hi': 'hi-IN', 'bn': 'bn-IN', 'ta': 'ta-IN', 'te': 'te-IN', 'mr': 'mr-IN', 'gu': 'gu-IN', 'kn': 'kn-IN', 'ml': 'ml-IN', 'pa': 'pa-IN', 'ur': 'ur-PK' };
-  const speechLang = langMap[targetLang] || targetLang;
+  setSpeakingUI(true);
 
-  const utterance = new SpeechSynthesisUtterance(state.translatedText);
-  utterance.lang = speechLang;
-  utterance.rate = 0.9;
-  utterance.pitch = 1;
+  // Try Google TTS audio first (works for Hindi, Punjabi, etc.)
+  speakWithGoogleTTS(text, targetLang)
+    .catch(() => {
+      // Fallback to browser SpeechSynthesis
+      return speakWithBrowser(text, targetLang);
+    })
+    .catch(() => {
+      resetSpeakButton();
+      showToast('Speech not available for this language.', 'error');
+    });
+}
 
-  // Assign a matching voice if found — otherwise let the browser pick
-  const matchingVoice = findVoice(speechLang) || findVoice(targetLang);
-  if (matchingVoice) utterance.voice = matchingVoice;
+/* ----------------------------------------------------------
+   Google Translate TTS (primary)
+   Plays MP3 audio from Google's TTS endpoint.
+   ✔ Hindi  ✔ Punjabi  ✔ Tamil  ✔ All major languages
+   ---------------------------------------------------------- */
+function speakWithGoogleTTS(text, langCode) {
+  return new Promise((resolve, reject) => {
+    // Google TTS has a ~200 char limit per request, so we chunk
+    const chunks = splitTTSChunks(text, 190);
+    let currentChunkIndex = 0;
 
-  utterance.onstart = () => {
-    state.isSpeaking = true;
+    function playNextChunk() {
+      if (currentChunkIndex >= chunks.length || !state.isSpeaking) {
+        if (state.isSpeaking) resetSpeakButton();
+        resolve();
+        return;
+      }
+
+      const chunk = chunks[currentChunkIndex];
+      const url =
+        `https://translate.google.com/translate_tts` +
+        `?ie=UTF-8&client=tw-ob&tl=${encodeURIComponent(langCode)}` +
+        `&q=${encodeURIComponent(chunk)}`;
+
+      const audio = new Audio(url);
+      state.currentAudio = audio;
+
+      audio.onended = () => {
+        currentChunkIndex++;
+        playNextChunk();
+      };
+
+      audio.onerror = () => {
+        state.currentAudio = null;
+        reject(new Error('Google TTS audio failed'));
+      };
+
+      audio.play().catch(() => {
+        state.currentAudio = null;
+        reject(new Error('Google TTS playback blocked'));
+      });
+    }
+
+    playNextChunk();
+  });
+}
+
+/**
+ * Split text for Google TTS (max ~200 chars per request).
+ * Breaks at sentence/word boundaries.
+ */
+function splitTTSChunks(text, maxLen) {
+  if (text.length <= maxLen) return [text];
+  const chunks = [];
+  let remaining = text;
+  while (remaining.length > maxLen) {
+    let idx = remaining.lastIndexOf('. ', maxLen);
+    if (idx < maxLen * 0.3) idx = remaining.lastIndexOf(', ', maxLen);
+    if (idx < maxLen * 0.3) idx = remaining.lastIndexOf(' ', maxLen);
+    if (idx <= 0) idx = maxLen;
+    else idx += 1;
+    chunks.push(remaining.slice(0, idx).trim());
+    remaining = remaining.slice(idx).trim();
+  }
+  if (remaining) chunks.push(remaining);
+  return chunks;
+}
+
+/* ----------------------------------------------------------
+   Browser SpeechSynthesis (fallback)
+   ---------------------------------------------------------- */
+function speakWithBrowser(text, langCode) {
+  return new Promise((resolve, reject) => {
+    if (!state.speechSynthesis) {
+      reject(new Error('SpeechSynthesis not supported'));
+      return;
+    }
+
+    const langMap = {
+      'zh': 'zh-CN', 'zh-TW': 'zh-TW',
+      'hi': 'hi-IN', 'bn': 'bn-IN', 'ta': 'ta-IN', 'te': 'te-IN',
+      'mr': 'mr-IN', 'gu': 'gu-IN', 'kn': 'kn-IN', 'ml': 'ml-IN',
+      'pa': 'pa-IN', 'ur': 'ur-PK',
+    };
+    const speechLang = langMap[langCode] || langCode;
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = speechLang;
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+
+    // Try to find a matching voice
+    const voices = state.speechSynthesis.getVoices();
+    const base = langCode.split('-')[0].toLowerCase();
+    const matchingVoice =
+      voices.find(v => v.lang.toLowerCase() === speechLang.toLowerCase()) ||
+      voices.find(v => v.lang.split('-')[0].toLowerCase() === base);
+    if (matchingVoice) utterance.voice = matchingVoice;
+
+    utterance.onend  = () => { resetSpeakButton(); resolve(); };
+    utterance.onerror = (e) => {
+      resetSpeakButton();
+      if (e.error !== 'canceled') reject(new Error(e.error));
+      else resolve();
+    };
+
+    state.currentUtterance = utterance;
+    state.speechSynthesis.speak(utterance);
+  });
+}
+
+/* ----------------------------------------------------------
+   Speak UI helpers
+   ---------------------------------------------------------- */
+function setSpeakingUI(speaking) {
+  state.isSpeaking = speaking;
+  if (speaking) {
     dom.speakBtn.classList.add('speaking');
     dom.speakBtn.innerHTML = `
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
@@ -697,25 +806,17 @@ function handleSpeak() {
         <rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/>
       </svg>
       Stop`;
-  };
-
-  utterance.onend = () => {
-    resetSpeakButton();
-  };
-
-  utterance.onerror = (e) => {
-    resetSpeakButton();
-    // 'canceled' fires when we call cancel() ourselves — not an error
-    if (e.error !== 'canceled') {
-      showToast('Speech not available for this language. Try another browser.', 'error');
-    }
-  };
-
-  state.currentUtterance = utterance;
-  state.speechSynthesis.speak(utterance);
+  }
 }
 
 function stopSpeaking() {
+  // Stop Google TTS audio
+  if (state.currentAudio) {
+    state.currentAudio.pause();
+    state.currentAudio.currentTime = 0;
+    state.currentAudio = null;
+  }
+  // Stop browser SpeechSynthesis
   if (state.speechSynthesis) {
     state.speechSynthesis.cancel();
   }
@@ -725,6 +826,7 @@ function stopSpeaking() {
 function resetSpeakButton() {
   state.isSpeaking = false;
   state.currentUtterance = null;
+  state.currentAudio = null;
   dom.speakBtn.classList.remove('speaking');
   dom.speakBtn.innerHTML = `
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
