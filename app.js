@@ -702,8 +702,8 @@ function speakWithGoogleTTS(text, langCode) {
 
       const chunk = chunks[currentChunkIndex];
       const url =
-        `https://translate.google.com/translate_tts` +
-        `?ie=UTF-8&client=tw-ob&tl=${encodeURIComponent(langCode)}` +
+        `https://translate.googleapis.com/translate_tts` +
+        `?client=gtx&ie=UTF-8&tl=${encodeURIComponent(langCode)}` +
         `&q=${encodeURIComponent(chunk)}`;
 
       const audio = new Audio(url);
