@@ -536,8 +536,8 @@ function displayTranslation(text, detectedLang, apiName) {
 
   // Enable action buttons
   dom.copyBtn.disabled = false;
-  // Enable TTS only if browser has a voice for the target language
-  dom.speakBtn.disabled = !hasTTSVoice(dom.targetLang.value);
+  // Always enable Listen — browser may have online voices not listed in getVoices()
+  dom.speakBtn.disabled = !state.speechSynthesis;
 
   // Show detected language badge (or API source if language unknown)
   if (detectedLang) {
@@ -651,19 +651,18 @@ async function handleCopy() {
    ============================================================ */
 
 /**
- * Check if the browser has a TTS voice for the given language code
- * @param {string} langCode - BCP-47 language code
- * @returns {boolean}
+ * Find the best matching voice for a language code.
+ * Returns null if none found — but speech may still work via online voices.
  */
-function hasTTSVoice(langCode) {
-  if (!state.speechSynthesis) return false;
+function findVoice(langCode) {
+  if (!state.speechSynthesis) return null;
   const voices = state.speechSynthesis.getVoices();
-  if (!voices.length) return true; // voices not yet loaded — be optimistic
   const base = langCode.split('-')[0].toLowerCase();
-  return voices.some(v => {
-    const vBase = v.lang.split('-')[0].toLowerCase();
-    return v.lang === langCode || vBase === base;
-  });
+
+  // Prefer exact match, then base-code match
+  return voices.find(v => v.lang.toLowerCase() === langCode.toLowerCase()) ||
+         voices.find(v => v.lang.split('-')[0].toLowerCase() === base) ||
+         null;
 }
 
 function handleSpeak() {
@@ -677,24 +676,17 @@ function handleSpeak() {
   const targetLang = dom.targetLang.value;
 
   // Map language code to BCP-47 for SpeechSynthesis
-  const langMap = { 'zh': 'zh-CN', 'zh-TW': 'zh-TW' };
+  const langMap = { 'zh': 'zh-CN', 'zh-TW': 'zh-TW', 'hi': 'hi-IN', 'bn': 'bn-IN', 'ta': 'ta-IN', 'te': 'te-IN', 'mr': 'mr-IN', 'gu': 'gu-IN', 'kn': 'kn-IN', 'ml': 'ml-IN', 'pa': 'pa-IN', 'ur': 'ur-PK' };
   const speechLang = langMap[targetLang] || targetLang;
-
-  // Check voices are actually available
-  const voices = state.speechSynthesis.getVoices();
-  const matchingVoice = voices.find(v => v.lang === speechLang) ||
-                        voices.find(v => v.lang.startsWith(targetLang.split('-')[0]));
-
-  if (voices.length && !matchingVoice) {
-    showToast('No voice available for this language in your browser.', 'error');
-    return;
-  }
 
   const utterance = new SpeechSynthesisUtterance(state.translatedText);
   utterance.lang = speechLang;
-  if (matchingVoice) utterance.voice = matchingVoice;
   utterance.rate = 0.9;
   utterance.pitch = 1;
+
+  // Assign a matching voice if found — otherwise let the browser pick
+  const matchingVoice = findVoice(speechLang) || findVoice(targetLang);
+  if (matchingVoice) utterance.voice = matchingVoice;
 
   utterance.onstart = () => {
     state.isSpeaking = true;
@@ -715,7 +707,7 @@ function handleSpeak() {
     resetSpeakButton();
     // 'canceled' fires when we call cancel() ourselves — not an error
     if (e.error !== 'canceled') {
-      showToast('No voice available for this language in your browser.', 'error');
+      showToast('Speech not available for this language. Try another browser.', 'error');
     }
   };
 
